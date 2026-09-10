@@ -127,6 +127,7 @@ class MainScreen(Screen):
         self.pending_class = None    # 第二个数字选中的班号
         self.grade_blocks = {}       # grade -> GradeBlock
         self.tiles = {}              # (grade, class_num) -> ClassTile
+        self.admin_visible = False   # 管理按钮（清零/设置）是否显示：默认隐藏，按 0 切换
         self._build_ui()
 
     def _build_ui(self):
@@ -164,19 +165,21 @@ class MainScreen(Screen):
         scroll.add_widget(self.grid_container)
         root.add_widget(scroll)
 
-        # 底部按钮
-        bottom = BoxLayout(
+        # 底部按钮：默认隐藏（按 0 切换显示；显示状态下按 7 清零、8 设置）
+        # 隐藏时高度归零、网格占满整屏；显示时占出 90dp 空间
+        self.bottom = BoxLayout(
             orientation="horizontal",
-            size_hint_y=None, height=dp(90),
-            spacing=dp(10), padding=[dp(12), dp(10)],
+            size_hint_y=None, height=0,
+            spacing=dp(10), padding=[0, 0],
+            opacity=0,
         )
         self.clear_btn = Button(text="清零", font_size=sp(24))
         self.clear_btn.bind(on_release=self._ask_clear)
         self.settings_btn = Button(text="设置", font_size=sp(24))
         self.settings_btn.bind(on_release=self._open_settings)
-        bottom.add_widget(self.clear_btn)
-        bottom.add_widget(self.settings_btn)
-        root.add_widget(bottom)
+        self.bottom.add_widget(self.clear_btn)
+        self.bottom.add_widget(self.settings_btn)
+        root.add_widget(self.bottom)
 
         self.add_widget(root)
 
@@ -260,15 +263,48 @@ class MainScreen(Screen):
         return None
 
     def _push_digit(self, digit):
+        # 0：切换管理按钮（清零/设置）的显示
+        if digit == "0":
+            self._toggle_admin()
+            return
+        # 7：仅在管理按钮可见时触发清零
+        if self.admin_visible and digit == "7":
+            self._admin_clear()
+            return
+        # 8：仅在管理按钮可见时进入设置
+        if self.admin_visible and digit == "8":
+            self._admin_settings()
+            return
+        # 1~6：正常年级+班号输入流程
         if self.selected_grade is None:
             self._select_grade(int(digit))
         else:
             self._select_class(int(digit))
 
+    def _toggle_admin(self):
+        self.admin_visible = not self.admin_visible
+        self._refresh_admin_visibility()
+
+    def _refresh_admin_visibility(self):
+        if self.admin_visible:
+            self.bottom.opacity = 1.0
+            self.bottom.height = dp(90)
+            self.bottom.padding = [dp(12), dp(10)]
+        else:
+            self.bottom.opacity = 0.0
+            self.bottom.height = 0
+            self.bottom.padding = [0, 0]
+
+    def _admin_clear(self):
+        self._ask_clear(None)
+
+    def _admin_settings(self):
+        self._open_settings(None)
+
     def _select_grade(self, grade):
         app = App.get_running_app()
         if grade not in GRADES:
-            return  # 0/7/8/9 等无效年级，忽略
+            return  # 9 等无效年级，忽略（0/7/8 已在上层 _push_digit 处理）
         self.selected_grade = grade
         self.pending_class = None
         self._refresh_focus()

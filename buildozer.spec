@@ -54,4 +54,7 @@ android.minapi = 21
 # (int) 编译目标 API（不影响老设备安装；用 33 兼顾新旧）
 android.api = 33
 
+# (bool) 自动接受 Android SDK 许可协议（CI 上必须开启，否则会卡在确认提示）
+android.accept_sdk_license = True
+
 # NDK 版本不显式指定，用 buildozer 默认（r25b，支持 armeabi-v7a）
