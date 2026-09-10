@@ -46,7 +46,25 @@ jobs:
             buildozer-global-
 
       - name: Build debug APK
-        run: buildozer android debug
+        run: |
+          set +e
+          # 用 echo y 喂入 SDK 许可确认（CI 上无人值守的兜底）
+          OUT=$(echo y | buildozer android debug 2>&1)
+          RC=$?
+          echo "$OUT"
+          if [ $RC -eq 0 ]; then exit 0; fi
+
+          # 非 aidl 报错：原样退出，让 CI 报错显示真实问题
+          if ! echo "$OUT" | grep -q "aidl not found"; then exit $RC; fi
+
+          echo ">>> aidl missing, installing build-tools via sdkmanager..."
+          SDKMANAGER=$(find ~/.buildozer -name sdkmanager -type f -executable | head -1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo ">>> sdkmanager not found"; exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "build-tools;33.0.2" > /dev/null 2>&1 || true
+          buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
